@@ -20,7 +20,7 @@ UI = {
     "en": {
         "page_title": "Cross-Language SEO Intent Tool",
         "main_title": "Cross-Language SEO Intent Tool",
-        "subtitle": "Enter a source keyword \u2192 Discover real search terms in the target market \u2192 Deep analysis of search data & intent",
+        "subtitle": "Find the <span style='background:linear-gradient(90deg,#818cf8,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700;'>right keywords</span> and <span style='background:linear-gradient(90deg,#38bdf8,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700;'>infinite opportunities</span> in any language.",
         "settings": "\u2699\ufe0f Settings",
         "ui_lang_label": "Interface Language",
         "api_token_label": "Ahrefs API Token",
@@ -116,7 +116,7 @@ UI = {
     "zh": {
         "page_title": "\u8de8\u8bed\u79cd SEO \u610f\u56fe\u67e5\u8bcd\u5de5\u5177",
         "main_title": "\u8de8\u8bed\u79cd SEO \u610f\u56fe\u67e5\u8bcd\u5de5\u5177",
-        "subtitle": "\u8f93\u5165\u6e90\u8bed\u8a00\u5173\u952e\u8bcd \u2192 \u667a\u80fd\u53d1\u73b0\u76ee\u6807\u5e02\u573a\u771f\u5b9e\u641c\u7d22\u8bcd \u2192 \u6df1\u5ea6\u5206\u6790\u641c\u7d22\u6570\u636e\u4e0e\u610f\u56fe",
+        "subtitle": "用任意语言，找到<span style='background:linear-gradient(90deg,#818cf8,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700;'>精准关键词</span>与<span style='background:linear-gradient(90deg,#38bdf8,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700;'>无限增长机会</span>。",
         "settings": "\u2699\ufe0f \u8bbe\u7f6e",
         "ui_lang_label": "\u754c\u9762\u8bed\u8a00",
         "api_token_label": "Ahrefs API Token",
@@ -725,7 +725,7 @@ st.markdown(
         background:linear-gradient(90deg,#818cf8,#6366f1,#4f46e5);
         -webkit-background-clip:text; -webkit-text-fill-color:transparent;
         margin:18px 0 6px 0;}
-    .sub-title {font-size:1rem; color:#94a3b8; text-align:center; margin-bottom:20px;}
+    .sub-title {font-size:1.2rem; color:#94a3b8; text-align:center; margin-bottom:24px; line-height:1.6;}
     /* ── Params row ── */
     .param-hint {font-size:0.78rem; color:#64748b; text-align:center; margin-top:6px;}
     /* ── Results ── */
@@ -851,20 +851,19 @@ with ctrl_3:
             "Ahrefs API Token",
             type="password",
             value="",
-            help="Optional: use your own key for unlimited queries.",
+            help="Platform key is used by default (30 keywords free). Enter your own key for unlimited results.",
         )
 with ctrl_4:
-    # Compute derived values OUTSIDE the columns so they are always available
-    # (defined here but referenced after the column block)
     _has_own_api_tmp = bool((api_token_input or "").strip())
     if _has_own_api_tmp:
+        # Own API key → unlimited, user can freely set limit
         result_limit_raw = st.number_input(
             T("result_limit_label"), min_value=10, max_value=500, value=100, step=10
         )
     else:
-        result_limit_raw = 10
-        st.number_input(
-            T("result_limit_label"), min_value=10, max_value=10, value=10, step=10, disabled=True
+        # Platform key (guests + registered users without own key) → capped at 30
+        result_limit_raw = st.number_input(
+            T("result_limit_label"), min_value=10, max_value=30, value=30, step=10
         )
 
 # --- Derive shared variables AFTER all widget columns ---
@@ -881,7 +880,7 @@ if is_logged_in:
     )
 else:
     st.markdown(
-        '<div class="param-hint">Guest: 1 free query · top-5 preview &nbsp;·&nbsp; Powered by Ahrefs &amp; Google Translate</div>',
+        '<div class="param-hint">Free · 30 keywords per query &nbsp;·&nbsp; Powered by Ahrefs &amp; Google Translate</div>',
         unsafe_allow_html=True,
     )
 
@@ -894,25 +893,20 @@ if discover_clicked:
         st.stop()
 
     credits_used = 0
+    using_own_key = bool((api_token_input or "").strip())
     if is_logged_in:
-        using_own_key = bool((api_token_input or "").strip())
+        # Registered user without own key: deduct 1 platform credit per query
         if not using_own_key:
             if not deduct_credit_if_possible(int(user["id"])):
                 st.error("Credits exhausted. Please contact admin to top up.")
                 st.stop()
             credits_used = 1
     else:
-        using_own_key = bool((api_token_input or "").strip())
-        # Guest without own API: only one trial query
-        if using_own_key:
-            pass
-        elif st.session_state.guest_used_free_query:
-            st.error("Free trial used up. Please register/login to continue.")
-            with st.expander("Register / Login now"):
-                render_auth_gate()
+        # Guest: platform key is used by default, no query limit
+        # (own key overrides platform key automatically via effective_api_token)
+        if not effective_api_token:
+            st.warning("No API key available. Please enter your own Ahrefs API Token to continue.")
             st.stop()
-        else:
-            st.session_state.guest_used_free_query = True
 
     st.session_state.discovery_done = False
     st.session_state.candidates_df = None
@@ -1130,9 +1124,9 @@ if discover_clicked:
         all_candidates = all_candidates[:result_limit]
 
         total_found = len(all_candidates)
-        if (not is_logged_in) and (not has_own_api) and total_found > 5:
-            all_candidates = all_candidates[:5]
-            st.info(f"Guest preview: showing 5/{total_found}. Register/login to unlock full table.")
+        if (not is_logged_in) and (not has_own_api):
+            # Guest using platform key: show full results, soft-prompt to register for extra features
+            st.info("✨ Register for free to save your history, get extra credits, and unlock CSV export.")
         log_query(
             int(user["id"]) if is_logged_in else None,
             st.session_state.session_id,
