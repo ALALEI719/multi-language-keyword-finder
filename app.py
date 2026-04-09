@@ -1,4 +1,5 @@
 import os
+from ga import inject_ga
 import streamlit as st
 import requests
 import pandas as pd
@@ -702,6 +703,7 @@ st.set_page_config(
     page_icon="🌍",
     layout="wide",
 )
+inject_ga()  # Google Analytics — must be called right after set_page_config
 
 st.markdown(
     """
