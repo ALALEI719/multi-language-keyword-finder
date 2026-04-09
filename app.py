@@ -915,32 +915,26 @@ if discover_clicked:
 
     raw_kw = keyword_input.strip()
 
-    # 1a — Translate
-    with st.status(T("status_translating"), expanded=True) as status:
+    # ── Single spinner — all intermediate steps hidden from user ──────────────
+    with st.spinner("🔍 Analysing keywords…"):
+        # Step 1: translate
         translated = translate_keyword(raw_kw, source_lang, target_lang)
-        st.write(f"**{raw_kw}** → **{translated}** ({target_country_name})")
-        status.update(label=f"{T('status_translating')} ✅", state="complete")
 
-    # 1b — Multi-strategy keyword discovery
-    with st.status(T("status_related_orig"), expanded=True) as status:
+        # Step 2: multi-strategy discovery
         all_candidates = []
         seen = set()
 
-        st.write("1/4 …")
         sug_translated = fetch_search_suggestions(effective_api_token, translated, target_country, limit=20)
         sug_translated_kws = sug_translated.get("keywords", []) if sug_translated else []
 
-        st.write("2/4 …")
         ov_translated = fetch_ahrefs_overview(effective_api_token, translated, target_country)
         direct_kw = None
         if ov_translated and ov_translated.get("keywords"):
             direct_kw = ov_translated["keywords"][0]
 
-        st.write("3/4 …")
         rel_original = fetch_ahrefs_related(effective_api_token, raw_kw, target_country, limit=result_limit)
         rel_original_kws = rel_original.get("keywords", []) if rel_original else []
 
-        st.write("4/4 …")
         rel_translated = fetch_ahrefs_related(effective_api_token, translated, target_country, limit=result_limit)
         rel_translated_kws = rel_translated.get("keywords", []) if rel_translated else []
 
@@ -968,7 +962,7 @@ if discover_clicked:
         for item in sug_translated_kws:
             _add(item, "suggestion")
 
-        st.write(T("status_roots"))
+        # Step 3: root term extraction
         word_counter = Counter()
         bigram_counter = Counter()
         for c in all_candidates:
@@ -993,8 +987,6 @@ if discover_clicked:
                     if not (bg_set & KNOWN_BRANDS):
                         bigram_counter[bg] += 1
 
-        # Top frequent unigrams and bigrams (appear in 3+ keywords)
-        # Filter out source-language words to only extract target-language roots
         source_words = set(raw_kw.lower().split()) | ENGLISH_STOPWORDS | COMMON_ENGLISH_WORDS
         root_terms = []
         for bg, cnt in bigram_counter.most_common(10):
@@ -1009,7 +1001,6 @@ if discover_clicked:
             if len(root_terms) >= 12:
                 break
 
-        # Build initial topic_words BEFORE root extraction (for validation)
         initial_topic = set()
         for w in translated.lower().split():
             if len(w) >= 2 and w not in KNOWN_BRANDS:
@@ -1023,7 +1014,6 @@ if discover_clicked:
                 initial_topic.add(w)
 
         if root_terms:
-            st.write(T("root_found", n=len(root_terms), terms=", ".join(root_terms[:5])))
             root_csv = ",".join(root_terms)
             root_data = fetch_ahrefs_overview(effective_api_token, root_csv, target_country)
             if root_data and root_data.get("keywords"):
@@ -1032,8 +1022,6 @@ if discover_clicked:
                         continue
                     kw = item.get("keyword", "")
                     pt = (item.get("parent_topic") or "").lower()
-                    # Only add if the keyword itself or its parent_topic
-                    # overlaps with initial topic words (prevents "mini" → "e mini cooper")
                     kw_words = set(kw.lower().split())
                     pt_words = set(pt.split())
                     if (kw_words & initial_topic) or (pt_words & initial_topic):
@@ -1050,10 +1038,8 @@ if discover_clicked:
 
         pre_filter_count = len(all_candidates)
 
-        st.write(T("status_filter"))
+        # Step 4: language + brand filter
         all_candidates = filter_candidates(all_candidates, target_lang, raw_kw)
-
-        st.write(T("status_brand"))
         pre_brand_count = len(all_candidates)
         all_candidates = filter_brand_keywords(all_candidates)
 
@@ -1068,9 +1054,8 @@ if discover_clicked:
         }, "MULTI")
         # #endregion
 
-        # --- Re-query through overview for accurate data ---
+        # Step 5: re-query accurate data via overview
         if all_candidates:
-            st.write(T("status_overview"))
             kw_csv = ",".join(c["keyword"] for c in all_candidates[:result_limit])
             accurate_data = fetch_ahrefs_overview(effective_api_token, kw_csv, target_country)
             if accurate_data and accurate_data.get("keywords"):
@@ -1083,14 +1068,10 @@ if discover_clicked:
                             if acc.get(field) is not None:
                                 c[field] = acc[field]
 
-        # --- Translation-based relevance scoring ---
-        # Translate candidate keywords back to source language, then compare
-        # with source keyword to determine true semantic relevance.
+        # Step 6: back-translation relevance scoring
         if all_candidates:
-            st.write(T("status_rel_translate"))
             kw_list_for_rel = [c["keyword"] for c in all_candidates]
             back_translations = batch_translate(kw_list_for_rel, target_lang, source_lang)
-
             for c in all_candidates:
                 bt = back_translations.get(c["keyword"], "")
                 c["_back_translation"] = bt
@@ -1103,10 +1084,8 @@ if discover_clicked:
         }, "TRANSLATION")
         # #endregion
 
-        # REMOVE keywords with zero relevance to source keyword
+        # Remove zero-relevance keywords, sort by relevance then volume
         all_candidates = [c for c in all_candidates if c.get("_rel_score", 0) > 0]
-
-        # Sort: PRIMARY = translation relevance DESC, SECONDARY = volume DESC
         all_candidates.sort(
             key=lambda x: (x.get("_rel_score", 0), x.get("volume") or 0),
             reverse=True,
@@ -1120,13 +1099,9 @@ if discover_clicked:
         }, "RELEVANCE")
         # #endregion
 
-        # --- Apply result limit ---
         all_candidates = all_candidates[:result_limit]
-
         total_found = len(all_candidates)
-        if (not is_logged_in) and (not has_own_api):
-            # Guest using platform key: show full results, soft-prompt to register for extra features
-            st.info("✨ Register for free to save your history, get extra credits, and unlock CSV export.")
+
         log_query(
             int(user["id"]) if is_logged_in else None,
             st.session_state.session_id,
@@ -1134,10 +1109,13 @@ if discover_clicked:
             target_country,
             credits_used=credits_used,
         )
-        if total_found > 0:
-            status.update(label=T("status_done", n=total_found), state="complete")
-        else:
-            status.update(label=T("status_none"), state="error")
+
+    # ── Post-spinner feedback ─────────────────────────────────────────────────
+    if total_found == 0:
+        st.warning(T("status_none"))
+    else:
+        if (not is_logged_in) and (not has_own_api):
+            st.info("✨ Register for free to save your history, get extra credits, and unlock CSV export.")
 
     if all_candidates:
         meanings = {c["keyword"]: c.get("_back_translation", "—") for c in all_candidates}
