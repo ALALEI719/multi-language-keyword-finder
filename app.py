@@ -869,20 +869,27 @@ with ctrl_4:
         )
 
 # --- Derive shared variables AFTER all widget columns ---
-platform_api_key = os.getenv("PLATFORM_AHREFS_KEY", "").strip()
+# Env var takes priority; hardcoded key is the fallback so guests always get 1 free query
+_PLATFORM_KEY_FALLBACK = "72sriOok1gJtA3BxvRca5djPL1-J6ZmEMkKb5Qru"
+platform_api_key = os.getenv("PLATFORM_AHREFS_KEY", _PLATFORM_KEY_FALLBACK).strip()
 has_own_api = bool((api_token_input or "").strip())
 effective_api_token = (api_token_input or "").strip() or platform_api_key
 result_limit = int(result_limit_raw)   # ensure int, not float
 
-# Status hint (one line, not two)
+# Status hint
 if is_logged_in:
     st.markdown(
         f'<div class="param-hint">Logged in: {user["email"]} &nbsp;|&nbsp; Credits: {user["credits"]} &nbsp;·&nbsp; Powered by Ahrefs &amp; Google Translate</div>',
         unsafe_allow_html=True,
     )
+elif st.session_state.guest_used_free_query:
+    st.markdown(
+        '<div class="param-hint">Free trial used · <a href="#" style="color:#818cf8;">Register free</a> to continue &nbsp;·&nbsp; Powered by Ahrefs &amp; Google Translate</div>',
+        unsafe_allow_html=True,
+    )
 else:
     st.markdown(
-        '<div class="param-hint">Free · 30 keywords per query &nbsp;·&nbsp; Powered by Ahrefs &amp; Google Translate</div>',
+        '<div class="param-hint">1 free query for guests · 30 keywords · Register for more &nbsp;·&nbsp; Powered by Ahrefs &amp; Google Translate</div>',
         unsafe_allow_html=True,
     )
 
@@ -904,11 +911,19 @@ if discover_clicked:
                 st.stop()
             credits_used = 1
     else:
-        # Guest: platform key is used by default, no query limit
-        # (own key overrides platform key automatically via effective_api_token)
-        if not effective_api_token:
-            st.warning("No API key available. Please enter your own Ahrefs API Token to continue.")
-            st.stop()
+        # Guest flow:
+        # - Has own API key → always allowed, unlimited
+        # - No own key + first visit → 1 free query using platform key
+        # - No own key + already used free query → block and prompt registration
+        if not using_own_key:
+            if st.session_state.guest_used_free_query:
+                st.warning("You've used your free trial query. Register for free to continue.")
+                with st.container(border=True):
+                    render_auth_gate()
+                st.stop()
+            else:
+                # Mark the free query as consumed BEFORE running (prevents refresh abuse)
+                st.session_state.guest_used_free_query = True
 
     st.session_state.discovery_done = False
     st.session_state.candidates_df = None
