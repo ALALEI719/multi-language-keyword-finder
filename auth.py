@@ -21,7 +21,7 @@ AUTH_UI = {
         "bad_email": "Invalid email format",
         "short_pwd": "Password must be at least 6 characters",
         "exists": "Email already registered",
-        "register_ok": "Registration successful, auto-logged in (10 free credits).",
+        "register_ok": "Registration successful, auto-logged in (5 free credits).",
     },
     "zh": {
         "system": "账号系统",
@@ -40,7 +40,7 @@ AUTH_UI = {
         "bad_email": "邮箱格式不正确",
         "short_pwd": "密码至少 6 位",
         "exists": "该邮箱已注册",
-        "register_ok": "注册成功，已自动登录（赠送 10 credits）",
+        "register_ok": "注册成功，已自动登录（赠送 5 credits）",
     },
 }
 
@@ -90,7 +90,7 @@ def register_user(email: str, password: str) -> tuple[bool, str]:
         return False, _t("short_pwd")
     if get_user_by_email(email):
         return False, _t("exists")
-    create_user(email, hash_password(password), credits=10)
+    create_user(email, hash_password(password), credits=5)
     ok, msg = login_user(email, password)
     if ok:
         return True, _t("register_ok")

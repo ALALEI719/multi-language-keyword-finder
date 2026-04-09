@@ -41,7 +41,7 @@ def init_db():
         conn.commit()
 
 
-def create_user(email: str, password_hash: str, credits: int = 10) -> int:
+def create_user(email: str, password_hash: str, credits: int = 5) -> int:
     with get_conn() as conn:
         cur = conn.execute(
             "INSERT INTO users (email, password_hash, credits) VALUES (?, ?, ?)",

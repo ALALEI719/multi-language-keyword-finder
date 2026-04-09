@@ -26,7 +26,7 @@ UI = {
         "api_token_label": "Ahrefs API Token",
         "api_token_help": "Get your API Bearer Token from Ahrefs dashboard",
         "lang_settings": "\U0001f524 Language Settings",
-        "source_lang_label": "Source Language (your keyword\u2019s language)",
+        "source_lang_label": "Source Language",
         "target_country_label": "Target Country / Market",
         "result_settings": "\U0001f4ca Result Settings",
         "result_limit_label": "Max keywords to return",
@@ -122,7 +122,7 @@ UI = {
         "api_token_label": "Ahrefs API Token",
         "api_token_help": "\u5728 Ahrefs \u540e\u53f0\u83b7\u53d6\u4f60\u7684 API Bearer Token",
         "lang_settings": "\U0001f524 \u8bed\u8a00\u8bbe\u7f6e",
-        "source_lang_label": "\u6e90\u8bed\u8a00\uff08\u4f60\u8f93\u5165\u5173\u952e\u8bcd\u7684\u8bed\u8a00\uff09",
+        "source_lang_label": "源语言",
         "target_country_label": "\u76ee\u6807\u56fd\u5bb6/\u5e02\u573a",
         "result_settings": "\U0001f4ca \u7ed3\u679c\u8bbe\u7f6e",
         "result_limit_label": "\u76f8\u5173\u8bcd\u6570\u91cf\u4e0a\u9650",
@@ -697,21 +697,50 @@ def fetch_ahrefs_related(api_token: str, keywords: str, country: str, limit: int
 # UI
 # ---------------------------------------------------------------------------
 
-st.set_page_config(page_title="Cross-Language SEO Intent Tool", page_icon="🌍", layout="wide")
+st.set_page_config(
+    page_title="Multi-Language Keyword Finder | Cross-Language SEO Intent Tool",
+    page_icon="🌍",
+    layout="wide",
+)
 
 st.markdown(
     """
     <style>
-    .main-title {font-size:2.4rem; font-weight:800; background:linear-gradient(90deg,#818cf8,#6366f1,#4f46e5);
-        -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:0.2rem;}
-    .sub-title {font-size:1.05rem; color:#94a3b8; margin-bottom:1.5rem;}
+    /* ── Layout ── */
+    .block-container {max-width: 1200px !important; margin: 0 auto !important;
+        padding-top: 0.5rem !important; padding-left: 2rem !important; padding-right: 2rem !important;}
+    section[data-testid="stMain"] > div:first-child {max-width: 1200px !important; margin: 0 auto !important;}
+    header[data-testid="stHeader"] {display:none;}
+    /* ── Global text centering for Streamlit markdown blocks ── */
+    .stMarkdown p, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3,
+    .stMarkdown h4, .stMarkdown blockquote {text-align: center !important;}
+    .stMarkdown ol, .stMarkdown ul {text-align: center !important; list-style-position: inside; padding-left: 0;}
+    .stMarkdown strong {text-align: center;}
+    /* ── Nav ── */
+    .nav-bar {display:flex; align-items:center; justify-content:space-between;
+        padding:10px 0 14px 0; border-bottom:1px solid #1e2d4a; margin-bottom:16px;}
+    .brand {font-size:1rem; font-weight:700; color:#c7d4f5; letter-spacing:.01em;}
+    /* ── Hero ── */
+    .main-title {font-size:2.5rem; font-weight:800; text-align:center;
+        background:linear-gradient(90deg,#818cf8,#6366f1,#4f46e5);
+        -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+        margin:18px 0 6px 0;}
+    .sub-title {font-size:1rem; color:#94a3b8; text-align:center; margin-bottom:20px;}
+    /* ── Params row ── */
+    .param-hint {font-size:0.78rem; color:#64748b; text-align:center; margin-top:6px;}
+    /* ── Results ── */
+    .section-h2 {font-size:1.4rem; font-weight:700; margin:1.6rem 0 0.6rem 0; text-align:center;}
+    .section-h3 {font-size:1.1rem; font-weight:700; margin:1rem 0 0.3rem 0; text-align:center;}
+    .section-p {font-size:0.95rem; color:#94a3b8; text-align:center; line-height:1.7; margin-bottom:0.8rem;}
+    .section-wrap {max-width:700px; margin:0 auto; text-align:center;}
+    .step-header {font-size:1.05rem; font-weight:700; color:#818cf8; margin:1rem 0 0.5rem 0;
+        padding:0.5rem 1rem; background:#1e293b; border-radius:8px; border-left:4px solid #6366f1;}
+    /* ── Metric cards ── */
     .metric-card {background:#1e293b; border-radius:12px; padding:1.2rem; text-align:center;
         border:1px solid #334155;}
     .metric-val {font-size:1.8rem; font-weight:700; color:#e2e8f0;}
     .metric-label {font-size:0.85rem; color:#94a3b8; margin-top:0.3rem;}
     div[data-testid="stDataFrame"] table {font-size:0.9rem;}
-    .step-header {font-size:1.1rem; font-weight:700; color:#818cf8; margin:1rem 0 0.5rem 0;
-        padding:0.5rem 1rem; background:#1e293b; border-radius:8px; border-left:4px solid #6366f1;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -735,88 +764,55 @@ if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 if "allow_guest_mode" not in st.session_state:
     st.session_state.allow_guest_mode = False
+if "show_auth_panel" not in st.session_state:
+    st.session_state.show_auth_panel = False
 
 user = current_user()
 is_logged_in = user is not None
 
-# --- Sidebar ---
-with st.sidebar:
-    st.markdown(f"### {T('settings')}")
-
+# ---------------------------------------------------------------------------
+# TOP NAVIGATION  (pure HTML row — no st.columns, avoids baseline mismatch)
+# ---------------------------------------------------------------------------
+nav_l_col, nav_lang_col, nav_auth_col = st.columns([6, 2, 2])
+with nav_l_col:
+    st.markdown('<div class="brand">🌍 Multi-Language Keyword Finder</div>', unsafe_allow_html=True)
+with nav_lang_col:
     ui_lang_choice = st.selectbox(
-        T("ui_lang_label"),
+        "lang",
         ["English", "中文"],
         index=0 if st.session_state.ui_lang == "en" else 1,
+        label_visibility="collapsed",
     )
-    new_lang = "en" if ui_lang_choice == "English" else "zh"
-    if new_lang != st.session_state.ui_lang:
-        st.session_state.ui_lang = new_lang
-        st.rerun()
-
+with nav_auth_col:
     if is_logged_in:
-        st.success(f"Logged in: {user['email']}")
-        st.caption(f"Credits: {user['credits']}")
-        if st.button("Logout"):
+        if st.button("Logout", use_container_width=True):
             logout()
             st.rerun()
-        user_api_key = user["api_key"] or ""
-        api_token_input = st.text_input(
-            "Your Ahrefs API Token (optional)",
-            type="password",
-            value=user_api_key,
-            help="If provided, your own API key is used and credits are not consumed.",
-        )
-        if api_token_input != user_api_key:
-            update_user_api_key(int(user["id"]), api_token_input)
-            st.rerun()
     else:
-        st.info("Guest mode: 1 free query, 5 rows only.")
-        api_token_input = st.text_input(
-            "Your Ahrefs API Token (optional)",
-            type="password",
-            value="",
-            help="Guests can also use their own API key.",
-        )
+        if st.button("Login / Register", use_container_width=True):
+            st.session_state.show_auth_panel = not st.session_state.show_auth_panel
+            st.rerun()
 
-    platform_api_key = os.getenv("PLATFORM_AHREFS_KEY", "").strip()
-    effective_api_token = (api_token_input or "").strip() or platform_api_key
+# apply language change immediately
+new_lang = "en" if ui_lang_choice == "English" else "zh"
+if new_lang != st.session_state.ui_lang:
+    st.session_state.ui_lang = new_lang
+    st.rerun()
 
+# Login panel — render directly below nav, no expander wrapper (expander collapses on click)
+if (not is_logged_in) and st.session_state.show_auth_panel:
+    with st.container(border=True):
+        render_auth_gate()
     st.divider()
-    st.markdown(f"### {T('lang_settings')}")
-    source_lang_name = st.selectbox(T("source_lang_label"), list(SOURCE_LANG_OPTIONS.keys()), index=1)
-    source_lang = SOURCE_LANG_OPTIONS[source_lang_name]
 
-    target_country_name = st.selectbox(T("target_country_label"), list(COUNTRY_OPTIONS.keys()), index=0)
-    target_country = COUNTRY_OPTIONS[target_country_name]
-    target_lang = COUNTRY_TO_LANG.get(target_country, "en")
+# ---------------------------------------------------------------------------
+# HERO SECTION
+# ---------------------------------------------------------------------------
+st.markdown('<h1 class="main-title">Multi-Language Keyword Finder</h1>', unsafe_allow_html=True)
+st.markdown(f'<div class="sub-title">{T("subtitle")}</div>', unsafe_allow_html=True)
 
-    st.divider()
-    st.markdown(f"### {T('result_settings')}")
-    result_limit = st.slider(T("result_limit_label"), min_value=10, max_value=200, value=50, step=10)
-
-    st.divider()
-    st.markdown(
-        "<small style='color:#64748b'>Powered by Ahrefs API & Google Translate</small>",
-        unsafe_allow_html=True,
-    )
-
-# --- Page Header (after sidebar so T() works with selected language) ---
-st.markdown(f'<div class="main-title">🌍 {T("main_title")}</div>', unsafe_allow_html=True)
-st.markdown(
-    f'<div class="sub-title">{T("subtitle")}</div>',
-    unsafe_allow_html=True,
-)
-
-if not is_logged_in and not st.session_state.allow_guest_mode:
-    if not render_auth_gate():
-        st.stop()
-
-# ========================================================================
-# STEP 1 — Keyword Discovery
-# ========================================================================
-st.markdown(f'<div class="step-header">{T("step1_header")}</div>', unsafe_allow_html=True)
-
-col_input, col_btn = st.columns([4, 1])
+# Search row
+col_input, col_btn = st.columns([5, 2])
 with col_input:
     keyword_input = st.text_input(
         T("step1_header"),
@@ -825,6 +821,69 @@ with col_input:
     )
 with col_btn:
     discover_clicked = st.button(T("discover_btn"), use_container_width=True, type="primary")
+
+# ---------------------------------------------------------------------------
+# PARAMETERS ROW
+# ---------------------------------------------------------------------------
+ctrl_1, ctrl_2, ctrl_3, ctrl_4 = st.columns(4)
+with ctrl_1:
+    source_lang_name = st.selectbox(T("source_lang_label"), list(SOURCE_LANG_OPTIONS.keys()), index=1)
+    source_lang = SOURCE_LANG_OPTIONS[source_lang_name]
+with ctrl_2:
+    target_country_name = st.selectbox(T("target_country_label"), list(COUNTRY_OPTIONS.keys()), index=0)
+    target_country = COUNTRY_OPTIONS[target_country_name]
+    target_lang = COUNTRY_TO_LANG.get(target_country, "en")
+with ctrl_3:
+    if is_logged_in:
+        user_api_key = user["api_key"] or ""
+        api_token_input = st.text_input(
+            T("api_token_label"),
+            type="password",
+            value=user_api_key,
+            help="Uses your own key; no credits deducted.",
+            label_visibility="visible",
+        )
+        if api_token_input != user_api_key:
+            update_user_api_key(int(user["id"]), api_token_input)
+            st.rerun()
+    else:
+        api_token_input = st.text_input(
+            "Ahrefs API Token",
+            type="password",
+            value="",
+            help="Optional: use your own key for unlimited queries.",
+        )
+with ctrl_4:
+    # Compute derived values OUTSIDE the columns so they are always available
+    # (defined here but referenced after the column block)
+    _has_own_api_tmp = bool((api_token_input or "").strip())
+    if _has_own_api_tmp:
+        result_limit_raw = st.number_input(
+            T("result_limit_label"), min_value=10, max_value=500, value=100, step=10
+        )
+    else:
+        result_limit_raw = 10
+        st.number_input(
+            T("result_limit_label"), min_value=10, max_value=10, value=10, step=10, disabled=True
+        )
+
+# --- Derive shared variables AFTER all widget columns ---
+platform_api_key = os.getenv("PLATFORM_AHREFS_KEY", "").strip()
+has_own_api = bool((api_token_input or "").strip())
+effective_api_token = (api_token_input or "").strip() or platform_api_key
+result_limit = int(result_limit_raw)   # ensure int, not float
+
+# Status hint (one line, not two)
+if is_logged_in:
+    st.markdown(
+        f'<div class="param-hint">Logged in: {user["email"]} &nbsp;|&nbsp; Credits: {user["credits"]} &nbsp;·&nbsp; Powered by Ahrefs &amp; Google Translate</div>',
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        '<div class="param-hint">Guest: 1 free query · top-5 preview &nbsp;·&nbsp; Powered by Ahrefs &amp; Google Translate</div>',
+        unsafe_allow_html=True,
+    )
 
 if discover_clicked:
     if not effective_api_token:
@@ -843,10 +902,17 @@ if discover_clicked:
                 st.stop()
             credits_used = 1
     else:
-        if st.session_state.guest_used_free_query:
-            st.error("Guest free query already used. Please register/login.")
+        using_own_key = bool((api_token_input or "").strip())
+        # Guest without own API: only one trial query
+        if using_own_key:
+            pass
+        elif st.session_state.guest_used_free_query:
+            st.error("Free trial used up. Please register/login to continue.")
+            with st.expander("Register / Login now"):
+                render_auth_gate()
             st.stop()
-        st.session_state.guest_used_free_query = True
+        else:
+            st.session_state.guest_used_free_query = True
 
     st.session_state.discovery_done = False
     st.session_state.candidates_df = None
@@ -1064,7 +1130,7 @@ if discover_clicked:
         all_candidates = all_candidates[:result_limit]
 
         total_found = len(all_candidates)
-        if not is_logged_in and total_found > 5:
+        if (not is_logged_in) and (not has_own_api) and total_found > 5:
             all_candidates = all_candidates[:5]
             st.info(f"Guest preview: showing 5/{total_found}. Register/login to unlock full table.")
         log_query(
@@ -1295,18 +1361,353 @@ if st.session_state.discovery_done and st.session_state.candidates_df is not Non
                 },
             )
 
-            csv_data = filtered.to_csv(index=False).encode("utf-8-sig")
-            st.download_button(
-                label=T("download_csv"),
-                data=csv_data,
-                file_name=f"seo_keywords_{selected}_{target_country}.csv",
-                mime="text/csv",
-            )
+            st.info("CSV export is currently locked for all user tiers.")
     else:
         st.info("Register/login to unlock deep analysis and CSV download.")
 
 # --- Landing page ---
 if not st.session_state.discovery_done:
     st.markdown("---")
-    st.markdown(f"### {T('landing_title')}")
-    st.markdown(T("landing_body"))
+    _is_zh = st.session_state.ui_lang == "zh"
+
+    # ── step data ──────────────────────────────────────────────────────────────
+    _steps_en = [
+        {
+            "num": "01", "label": "Keyword Discovery",
+            "grad": "linear-gradient(135deg,#6366f1,#8b5cf6)",
+            "border": "#6366f1",
+            "glow": "rgba(99,102,241,.12)",
+            "step_word": "Step",
+            "actions": [
+                ("🔑", "Enter your Ahrefs API Token in the field above", False),
+                ("🌐", "Choose your source language and target country", False),
+                ("🔍", 'Enter a keyword and click &ldquo;Discover Keywords&rdquo;', False),
+                ("✨", "The tool translates your keyword and uses Ahrefs to find <strong style='color:#e2e8f0'>real search terms used in the target market</strong>", True),
+            ],
+        },
+        {
+            "num": "02", "label": "Deep Analysis",
+            "grad": "linear-gradient(135deg,#8b5cf6,#d946ef)",
+            "border": "#8b5cf6",
+            "glow": "rgba(139,92,246,.12)",
+            "step_word": "Step",
+            "actions": [
+                ("📊", "Pick the highest-volume keyword that matches your intent", False),
+                ("🖱️", 'Click <strong style="color:#e2e8f0">&ldquo;Deep Analysis&rdquo;</strong> for full data + all related terms', True),
+            ],
+        },
+    ]
+    _steps_zh = [
+        {
+            "num": "01", "label": "关键词发现",
+            "grad": "linear-gradient(135deg,#6366f1,#8b5cf6)",
+            "border": "#6366f1",
+            "glow": "rgba(99,102,241,.12)",
+            "step_word": "步骤",
+            "actions": [
+                ("🔑", "在上方输入框填写你的 Ahrefs API Token", False),
+                ("🌐", "选择源语言和目标国家", False),
+                ("🔍", "输入关键词，点击「发现关键词」", False),
+                ("✨", "工具会翻译关键词，并从 Ahrefs 找出<strong style='color:#e2e8f0'>目标市场真实搜索词</strong>", True),
+            ],
+        },
+        {
+            "num": "02", "label": "深度分析",
+            "grad": "linear-gradient(135deg,#8b5cf6,#d946ef)",
+            "border": "#8b5cf6",
+            "glow": "rgba(139,92,246,.12)",
+            "step_word": "步骤",
+            "actions": [
+                ("📊", "挑选最符合搜索意图的高搜索量关键词", False),
+                ("🖱️", "点击<strong style='color:#e2e8f0'>「深度分析」</strong>获取完整数据和相关词", True),
+            ],
+        },
+    ]
+    _steps = _steps_zh if _is_zh else _steps_en
+
+    # ── builders (compact, zero-indent HTML to avoid markdown code-block trigger) ──
+    def _action_row(idx, icon, text, hi):
+        bg = "background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);" if hi else ""
+        num = str(idx + 1).zfill(2)
+        return (
+            f'<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;{bg}margin-bottom:6px;">'
+            f'<div style="flex-shrink:0;width:28px;height:28px;border-radius:8px;background:#1e293b;border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:.85rem;">{icon}</div>'
+            f'<div style="display:flex;align-items:flex-start;gap:8px;min-width:0;">'
+            f'<span style="color:#334155;font-size:.7rem;font-weight:700;flex-shrink:0;margin-top:2px;">{num}</span>'
+            f'<p style="margin:0;font-size:.85rem;color:#94a3b8;line-height:1.65;">{text}</p>'
+            f'</div></div>'
+        )
+
+    def _step_card(s):
+        rows = "".join(_action_row(i, icon, text, hi) for i, (icon, text, hi) in enumerate(s["actions"]))
+        return (
+            f'<div style="position:relative;border-radius:18px;border:1px solid #1e2d4a;background:#0f172a;overflow:hidden;flex:1;min-width:280px;">'
+            f'<div style="height:3px;background:{s["grad"]};"></div>'
+            f'<div style="padding:24px 24px 28px;">'
+            f'<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">'
+            f'<span style="font-size:2.8rem;font-weight:900;line-height:1;background:{s["grad"]};-webkit-background-clip:text;-webkit-text-fill-color:transparent;">{s["num"]}</span>'
+            f'<div>'
+            f'<p style="margin:0;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#475569;">{s["step_word"]}</p>'
+            f'<p style="margin:0;font-size:1rem;font-weight:700;color:#f1f5f9;">{s["label"]}</p>'
+            f'</div></div>'
+            f'<div style="border-left:2px solid {s["border"]};margin-left:14px;padding-left:18px;">{rows}</div>'
+            f'</div>'
+            f'<div style="position:absolute;bottom:-24px;right:-24px;width:100px;height:100px;background:{s["glow"]};border-radius:50%;filter:blur(28px);pointer-events:none;"></div>'
+            f'</div>'
+        )
+
+    cards_html = "".join(_step_card(s) for s in _steps)
+
+    if _is_zh:
+        _callout_title = "🎯 专业提示 — 为什么分两步？"
+        _callout_body = (
+            '<p style="margin:0;font-size:.85rem;color:#94a3b8;line-height:1.75;">'
+            '直译往往<strong style="color:#e2e8f0;">不是</strong>目标市场用户真正搜索的词。例如 '
+            '<code style="font-size:.75rem;background:#1e293b;border-radius:5px;padding:1px 7px;color:#cbd5e1;">Robot Lawn Mower</code> '
+            '直译为德语 '
+            '<code style="font-size:.75rem;background:#1e293b;border-radius:5px;padding:1px 7px;color:#f87171;text-decoration:line-through;">Roboter-Rasenm&auml;her</code>'
+            '（月搜约70次），但德国用户实际搜索的是 '
+            '<code style="font-size:.75rem;background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);border-radius:5px;padding:1px 7px;color:#a5b4fc;font-weight:700;">m&auml;hroboter</code>'
+            '（月搜数万次）。Ahrefs 建议帮助我们找到真正的<strong style="color:#e2e8f0;">高流量关键词。</strong>'
+            '</p>'
+        )
+        _section_title = "💡 使用说明"
+        _section_sub = "两个步骤，从源语言关键词找到目标市场的高流量本地词。"
+    else:
+        _callout_title = "🎯 Pro Tip — Why Two Steps?"
+        _callout_body = (
+            '<p style="margin:0;font-size:.85rem;color:#94a3b8;line-height:1.75;">'
+            'Direct translations are often <strong style="color:#e2e8f0;">not</strong> what target-market users actually search for. For example, '
+            '<code style="font-size:.75rem;background:#1e293b;border-radius:5px;padding:1px 7px;color:#cbd5e1;">Robot Lawn Mower</code> '
+            'translates to German '
+            '<code style="font-size:.75rem;background:#1e293b;border-radius:5px;padding:1px 7px;color:#f87171;text-decoration:line-through;">Roboter-Rasenm&auml;her</code>'
+            ' (only 70 searches/mo), but German users actually search for '
+            '<code style="font-size:.75rem;background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);border-radius:5px;padding:1px 7px;color:#a5b4fc;font-weight:700;">m&auml;hroboter</code>'
+            ' (tens of thousands/mo). Ahrefs suggestions surface the <strong style="color:#e2e8f0;">real high-traffic keywords.</strong>'
+            '</p>'
+        )
+        _section_title = "💡 How to Use"
+        _section_sub = "Two focused steps — from a source keyword to high-traffic, intent-matched local terms."
+
+    _how_html = (
+        '<div style="max-width:1100px;margin:0 auto;padding:48px 0 8px;">'
+        '<div style="text-align:center;margin-bottom:36px;">'
+        '<p style="font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#818cf8;margin-bottom:8px;">Get Started</p>'
+        f'<h2 style="font-size:1.55rem;font-weight:800;color:#f1f5f9;margin:0 0 8px 0;">{_section_title}</h2>'
+        f'<p style="font-size:.88rem;color:#64748b;margin:0;">{_section_sub}</p>'
+        '</div>'
+        f'<div style="display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap;">{cards_html}</div>'
+        '<div style="position:relative;border-radius:16px;border:1px solid rgba(245,158,11,.22);'
+        'background:linear-gradient(135deg,rgba(245,158,11,.07),rgba(245,158,11,.03),transparent);'
+        'overflow:hidden;padding:20px 24px;">'
+        '<div style="position:absolute;left:0;top:0;height:100%;width:3px;'
+        'background:linear-gradient(to bottom,#f59e0b,#d97706);border-radius:16px 0 0 16px;"></div>'
+        '<div style="display:flex;align-items:flex-start;gap:14px;">'
+        '<div style="flex-shrink:0;width:38px;height:38px;border-radius:10px;'
+        'background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.28);'
+        'display:flex;align-items:center;justify-content:center;font-size:1.1rem;">💡</div>'
+        '<div>'
+        f'<p style="margin:0 0 8px 0;font-size:.82rem;font-weight:700;color:#fcd34d;letter-spacing:.03em;">{_callout_title}</p>'
+        f'{_callout_body}'
+        '</div></div></div>'
+        '</div>'
+    )
+    st.markdown(_how_html, unsafe_allow_html=True)
+
+st.markdown("---")
+st.markdown("""
+<style>
+/* ── SEO Sections ── */
+.seo-section { max-width:1100px; margin:0 auto; padding:56px 0; }
+.seo-grid { display:grid; grid-template-columns:1fr 1fr; gap:56px; align-items:center; }
+.seo-grid-reverse { direction:rtl; }
+.seo-grid-reverse > * { direction:ltr; text-align:left !important; }
+.seo-label { font-size:0.72rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+    color:#818cf8; margin-bottom:10px; text-align:center !important; }
+.seo-h2 { font-size:1.55rem; font-weight:800; color:#f1f5f9; line-height:1.35; margin-bottom:14px;
+    text-align:center !important; }
+.seo-lead { font-size:0.93rem; color:#94a3b8; line-height:1.75; margin-bottom:20px;
+    text-align:left !important; }
+.seo-bullets { list-style:none; padding:0; margin:0 0 20px 0; display:flex; flex-direction:column;
+    gap:14px; text-align:left !important; }
+.seo-bullets li { display:flex; gap:12px; font-size:0.88rem; color:#94a3b8; line-height:1.65;
+    text-align:left !important; }
+.seo-bullet-dot { margin-top:7px; width:7px; height:7px; border-radius:50%;
+    background:#6366f1; flex-shrink:0; }
+.seo-bullets li strong { color:#e2e8f0; }
+.seo-callout { font-size:0.88rem; color:#c7d2fe; background:rgba(99,102,241,.08);
+    border:1px solid rgba(99,102,241,.25); border-radius:12px; padding:14px 18px; line-height:1.7;
+    text-align:left !important; }
+/* illustration boxes */
+.seo-illo { border-radius:18px; background:linear-gradient(135deg,#1e293b,#0f172a);
+    border:1px solid #1e2d4a; padding:32px 24px;
+    display:flex; flex-direction:column; gap:16px; overflow:hidden; position:relative; }
+.seo-illo::after { content:''; position:absolute; bottom:-24px; left:50%; transform:translateX(-50%);
+    width:180px; height:80px; background:rgba(99,102,241,.15); border-radius:50%; filter:blur(32px); }
+.kw-row { display:flex; align-items:center; gap:10px; }
+.kw-chip { padding:5px 12px; border-radius:8px; font-size:0.78rem; font-family:monospace;
+    font-weight:600; white-space:nowrap; }
+.kw-src { background:rgba(99,102,241,.18); border:1px solid rgba(99,102,241,.35); color:#a5b4fc; }
+.kw-dst { background:rgba(139,92,246,.18); border:1px solid rgba(139,92,246,.35); color:#c4b5fd; }
+.kw-line { flex:1; border-top:1px dashed #334155; }
+.kw-icon { font-size:1rem; flex-shrink:0; }
+/* use-case grid */
+.uc-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.uc-card { display:flex; flex-direction:column; align-items:center; gap:8px;
+    padding:20px 12px; border-radius:14px; font-size:0.8rem; font-weight:600;
+    color:#cbd5e1; border:1px solid; }
+.uc-card span.uc-icon { font-size:1.6rem; }
+/* FAQ */
+.faq-section { max-width:760px; margin:0 auto; padding:48px 0 56px; }
+.faq-title-label { font-size:0.72rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+    color:#818cf8; text-align:center; margin-bottom:8px; }
+.faq-h2 { font-size:1.55rem; font-weight:800; color:#f1f5f9; text-align:center; margin-bottom:36px; }
+details.faq-item { border:1px solid #1e2d4a; border-radius:14px; overflow:hidden; margin-bottom:10px;
+    background:#0f172a; transition:border-color .2s; }
+details.faq-item[open] { border-color:#334155; }
+details.faq-item summary { list-style:none; cursor:pointer; display:flex; justify-content:space-between;
+    align-items:center; gap:16px; padding:18px 22px; font-size:0.9rem; font-weight:600;
+    color:#e2e8f0; background:#1e293b; user-select:none; }
+details.faq-item summary::-webkit-details-marker { display:none; }
+details.faq-item summary::after { content:'＋'; color:#818cf8; font-size:1.1rem; flex-shrink:0;
+    transition:transform .25s; }
+details.faq-item[open] summary::after { content:'－'; }
+details.faq-item .faq-answer { padding:18px 22px; font-size:0.88rem; color:#94a3b8;
+    line-height:1.75; border-top:1px solid #1e2d4a; }
+@media(max-width:720px){
+    .seo-grid,.seo-grid-reverse { grid-template-columns:1fr; }
+    .seo-grid-reverse { direction:ltr; }
+}
+</style>
+
+<!-- ════════ Section 1: Why ════════ -->
+<div class="seo-section">
+  <div class="seo-grid">
+    <!-- Left: text -->
+    <div>
+      <p class="seo-label">The Core Problem</p>
+      <h2 class="seo-h2">Why Direct Translation Isn't Enough for International SEO</h2>
+      <p class="seo-lead">When executing cross-border e-commerce or global content marketing, many marketers make a fatal mistake: plugging their native keywords into a translation tool and using the literal results. This rarely works because <strong style="color:#e2e8f0;">language translation ≠ true Search Intent.</strong></p>
+      <ul class="seo-bullets">
+        <li><span class="seo-bullet-dot"></span><span><strong>Cultural Differences &amp; Slang:</strong> While an English speaker searches for "Cheap Flights," a French user might search for "Vols Low Cost" rather than "Vols Bon Marché."</span></li>
+        <li><span class="seo-bullet-dot"></span><span><strong>Platform Search Habits:</strong> When buying a laptop, German users search for "Notebook" far more frequently than "Laptop."</span></li>
+        <li><span class="seo-bullet-dot"></span><span><strong>Typos &amp; Abbreviations:</strong> Many users omit diacritics or use specific abbreviations when searching.</span></li>
+      </ul>
+      <p class="seo-callout">Our tool utilizes AI to deeply analyze the real search habits and cultural nuances of your target country, helping you discover <strong>high-potential, localized keywords.</strong></p>
+    </div>
+    <!-- Right: illustration -->
+    <div class="seo-illo">
+      <div class="kw-row">
+        <span class="kw-chip kw-src">Robot Lawn Mower</span>
+        <div class="kw-line"></div>
+        <span class="kw-icon">🌐</span>
+        <div class="kw-line"></div>
+        <span class="kw-chip kw-dst">mähroboter</span>
+      </div>
+      <div class="kw-row" style="opacity:.78">
+        <span class="kw-chip kw-src">Cheap Flights</span>
+        <div class="kw-line"></div>
+        <span class="kw-icon">🌐</span>
+        <div class="kw-line"></div>
+        <span class="kw-chip kw-dst">Vols Low Cost</span>
+      </div>
+      <div class="kw-row" style="opacity:.52">
+        <span class="kw-chip kw-src">Laptop</span>
+        <div class="kw-line"></div>
+        <span class="kw-icon">🌐</span>
+        <div class="kw-line"></div>
+        <span class="kw-chip kw-dst">Notebook</span>
+      </div>
+      <div class="kw-row" style="opacity:.32">
+        <span class="kw-chip kw-src">Running Shoes</span>
+        <div class="kw-line"></div>
+        <span class="kw-icon">🌐</span>
+        <div class="kw-line"></div>
+        <span class="kw-chip kw-dst">Chaussures Running</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr style="border:none;border-top:1px solid #1e2d4a;max-width:1100px;margin:0 auto;">
+
+<!-- ════════ Section 2: Who ════════ -->
+<div class="seo-section">
+  <div class="seo-grid seo-grid-reverse">
+    <!-- Left: text (rendered right because of rtl trick) -->
+    <div>
+      <p class="seo-label">Use Cases</p>
+      <h2 class="seo-h2">Who Needs a Multi-Language Keyword Explorer?</h2>
+      <p class="seo-lead">Whether you are a beginner running a Shopify store or an experienced SEO expert, this tool will save you <strong style="color:#e2e8f0;">hours of manual research time.</strong></p>
+      <ul class="seo-bullets">
+        <li><span class="seo-bullet-dot" style="background:#34d399;"></span><span><strong>Cross-Border E-commerce Sellers:</strong> Uncover "blue ocean" product keywords in niche markets, optimize your product listings, and lower your CPC.</span></li>
+        <li><span class="seo-bullet-dot" style="background:#38bdf8;"></span><span><strong>Global Content Creators &amp; Bloggers:</strong> Understand the exact questions users are asking. Create articles that perfectly match local search intent.</span></li>
+        <li><span class="seo-bullet-dot" style="background:#a78bfa;"></span><span><strong>International SEO Agencies:</strong> Generate multi-language keyword reports with a single click. Export directly to CSV.</span></li>
+      </ul>
+    </div>
+    <!-- Right: illustration -->
+    <div class="seo-illo" style="gap:12px;">
+      <div class="uc-grid">
+        <div class="uc-card" style="background:rgba(52,211,153,.07);border-color:rgba(52,211,153,.25);">
+          <span class="uc-icon">🛒</span>
+          <span style="color:#6ee7b7;">E-commerce</span>
+        </div>
+        <div class="uc-card" style="background:rgba(56,189,248,.07);border-color:rgba(56,189,248,.25);">
+          <span class="uc-icon">✍️</span>
+          <span style="color:#7dd3fc;">Content Creator</span>
+        </div>
+        <div class="uc-card" style="background:rgba(167,139,250,.07);border-color:rgba(167,139,250,.25);">
+          <span class="uc-icon">🏢</span>
+          <span style="color:#c4b5fd;">SEO Agency</span>
+        </div>
+        <div class="uc-card" style="background:rgba(251,191,36,.07);border-color:rgba(251,191,36,.25);">
+          <span class="uc-icon">📈</span>
+          <span style="color:#fde68a;">Growth Marketer</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr style="border:none;border-top:1px solid #1e2d4a;max-width:1100px;margin:0 auto;">
+
+<!-- ════════ Section 3: FAQ ════════ -->
+<div class="faq-section">
+  <p class="faq-title-label">Got Questions?</p>
+  <h2 class="faq-h2">Frequently Asked Questions</h2>
+
+  <details class="faq-item">
+    <summary>Are your Search Volume and Keyword Difficulty (KD) data accurate?</summary>
+    <div class="faq-answer">Yes. Our metrics connect via API to authoritative global SEO databases. This ensures that the search volume and competition difficulty you see accurately reflect the current reality of your target market.</div>
+  </details>
+
+  <details class="faq-item">
+    <summary>What is "Search Intent," and why is it crucial for multi-language SEO?</summary>
+    <div class="faq-answer">Search intent is the primary goal a user has when typing a query. Our tool uses AI to identify the intent behind your original keyword and matches it with vocabulary in the target language that shares that exact same intent, boosting your conversion rates.</div>
+  </details>
+
+  <details class="faq-item">
+    <summary>Which languages and countries does this tool support?</summary>
+    <div class="faq-answer">We support 50+ countries worldwide. Beyond mainstream languages, we excel at handling niche languages with complex cultural contexts, such as Japanese, Korean, Arabic, and Vietnamese.</div>
+  </details>
+
+  <details class="faq-item">
+    <summary>What is the difference between the Free version and the VIP version?</summary>
+    <div class="faq-answer">Free visitors can experience our core AI intent-mining features for a limited number of countries. Upgrading to VIP allows unlimited simultaneous country queries and one-click CSV exports.</div>
+  </details>
+</div>
+
+<!-- FAQPage JSON-LD for Google Rich Snippets -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type":"Question","name":"Are your Search Volume and Keyword Difficulty (KD) data accurate?","acceptedAnswer":{"@type":"Answer","text":"Yes. Our metrics connect via API to authoritative global SEO databases. This ensures that the search volume and competition difficulty you see accurately reflect the current reality of your target market."}},
+    {"@type":"Question","name":"What is \\"Search Intent,\\" and why is it crucial for multi-language SEO?","acceptedAnswer":{"@type":"Answer","text":"Search intent is the primary goal a user has when typing a query. Our tool uses AI to identify the intent behind your original keyword and matches it with vocabulary in the target language that shares that exact same intent, boosting your conversion rates."}},
+    {"@type":"Question","name":"Which languages and countries does this tool support?","acceptedAnswer":{"@type":"Answer","text":"We support 50+ countries worldwide. Beyond mainstream languages, we excel at handling niche languages with complex cultural contexts, such as Japanese, Korean, Arabic, and Vietnamese."}},
+    {"@type":"Question","name":"What is the difference between the Free version and the VIP version?","acceptedAnswer":{"@type":"Answer","text":"Free visitors can experience our core AI intent-mining features for a limited number of countries. Upgrading to VIP allows unlimited simultaneous country queries and one-click CSV exports."}}
+  ]
+}
+</script>
+""", unsafe_allow_html=True)
