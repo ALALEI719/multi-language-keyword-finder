@@ -220,15 +220,8 @@ def T(key: str, **kwargs) -> str:
         text = text.format(**kwargs)
     return text
 
-# #region agent log
-_DBG_LOG = "/Users/issuser/Developer/micro-saas-apps/.cursor/debug-36927c.log"
-def _dbg(location, message, data=None, hypothesis_id="?"):
-    try:
-        entry = {"sessionId": "36927c", "timestamp": int(time.time()*1000), "location": location, "message": message, "data": data or {}, "hypothesisId": hypothesis_id}
-        with open(_DBG_LOG, "a") as f: f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
-    except Exception:
-        pass  # silently skip on production where local log path doesn't exist
-# #endregion
+def _dbg(*args, **kwargs):
+    pass  # debug logging disabled in production
 
 # ---------------------------------------------------------------------------
 # Configuration & Constants
