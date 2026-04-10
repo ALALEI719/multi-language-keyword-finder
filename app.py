@@ -865,9 +865,8 @@ with ctrl_4:
         )
 
 # --- Derive shared variables AFTER all widget columns ---
-# Env var takes priority; hardcoded key is the fallback so guests always get 1 free query
-_PLATFORM_KEY_FALLBACK = "72sriOok1gJtA3BxvRca5djPL1-J6ZmEMkKb5Qru"
-platform_api_key = os.getenv("PLATFORM_AHREFS_KEY", _PLATFORM_KEY_FALLBACK).strip()
+# Platform Ahrefs key must come from environment only — never commit keys to git.
+platform_api_key = (os.getenv("PLATFORM_AHREFS_KEY") or "").strip()
 has_own_api = bool((api_token_input or "").strip())
 effective_api_token = (api_token_input or "").strip() or platform_api_key
 result_limit = int(result_limit_raw)   # ensure int, not float
